@@ -31,3 +31,30 @@ connectDB();
 function notifyUpdate() {
   io.emit("db_update");
 }
+
+
+
+//Slot Management
+//add new slot
+app.post("/api/slots", async (req, res) => {
+  try {
+    const { slotNumber, vehicleType, status = "free" } = req.body;
+
+    if (!slotNumber || !vehicleType) {
+      return res.status(400).json({ message: "slotNumber and vehicleType are required" });
+    }
+
+    const result = await db.collection("slots").insertOne({
+      slotNumber,
+      vehicleType,
+      status
+    });
+
+    res.status(201).json({
+      message: "Slot added successfully",
+      slotId: result.insertedId
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
