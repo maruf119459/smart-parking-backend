@@ -11,10 +11,16 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "canvas": "^3.2.1",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "mongoose": "^9.1.5",
-    "socket.io": "^4.8.3"
+    "firebase": "^12.8.0",
+    "jsqr": "^1.4.0",
+    "mongodb": "^7.0.0",
+    "qrcode": "^1.5.4",
+    "react-router-dom": "^7.13.0",
+    "socket.io": "^4.8.3",
+    "sslcommerz-lts": "^1.2.0"
   }
 }
