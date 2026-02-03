@@ -185,4 +185,34 @@ app.delete("/api/slots/:id", async (req, res) => {
     }
 });
 
+//get available slots count by vehicle type api
+app.get("/api/slots/available", async (req, res) => {
+    try {
+        const result = await db
+            .collection("slots")
+            .aggregate([
+                { $match: { status: "free" } },
+                {
+                    $group: {
+                        _id: "$vehicleType",
+                        available: { $sum: 1 }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        vehicleType: "$_id",
+                        available: 1
+                    }
+                }
+            ])
+            .toArray();
+
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 server.listen(5000, () => console.log("Server running on 5000"));
