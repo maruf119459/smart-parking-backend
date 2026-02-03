@@ -260,4 +260,26 @@ app.get("/api/parking/user-current-parking", async (req, res) => {
     }
 });
 
+// User Parkin History
+app.get("/api/parking/user-history", async (req, res) => {
+    try {
+        const { uid } = req.query;
+
+        if (!uid) {
+            return res.status(400).json({ error: "uid is required" });
+        }
+
+        const history = await db.collection("parking")
+            .find({
+                uid: uid,
+                status: { $in: ["entance_error", "completed"] }
+            })
+            .sort({ booking_time: -1 }) 
+            .toArray();
+
+        res.json(history);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
