@@ -282,4 +282,20 @@ app.get("/api/parking/user-history", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Get All Parking API
+app.get("/api/parking", async (req, res) => {
+  try {
+    const parkingData = await db
+      .collection("parking")
+      .find({})
+      .sort({ entryTime: -1 }) // optional: latest first
+      .toArray();
+
+    res.status(200).json(parkingData);
+  } catch (err) {
+    console.error("Get parking error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
