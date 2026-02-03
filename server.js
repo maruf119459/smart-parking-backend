@@ -309,4 +309,30 @@ app.patch("/api/parking/:entranceId", async (req, res) => {
   notifyUpdate();
   res.sendStatus(200);
 });
+
+// Get Only Parking Entry Exit Time
+app.get("/api/parking/times", async (req, res) => {
+    try {
+        const { parkingId, userId } = req.query;
+
+        const query = {};
+        if (parkingId) query._id = new ObjectId(parkingId);
+        if (userId) query.userId = userId;
+
+        const result = await db
+            .collection("parking")
+            .find(query, {
+                projection: {
+                    entryTime: 1,
+                    exitTime: 1,
+                    _id: 1
+                }
+            })
+            .toArray();
+
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
