@@ -237,5 +237,27 @@ app.post("/api/parking/book", async (req, res) => {
     res.sendStatus(201);
 });
 
+// User Current Parking
+app.get("/api/parking/user-current-parking", async (req, res) => {
+    try {
+        const { uid } = req.query;
+
+        if (!uid) {
+            return res.status(400).json({ error: "uid is required" });
+        }
+
+        const activeSessions = await db.collection("parking")
+            .find({
+                uid: uid,
+                status: { $in: ["inital", "parked", "paid", "repay"] }
+            })
+            .sort({ booking_time: -1 })
+            .toArray();
+
+        res.json(activeSessions);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 server.listen(5000, () => console.log("Server running on 5000"));
