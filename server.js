@@ -298,4 +298,15 @@ app.get("/api/parking", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Update parking info
+app.patch("/api/parking/:entranceId", async (req, res) => {
+    console.log(req.params.entranceId );
+  await db.collection("parking").updateOne(
+    { _id: new ObjectId(req.params.entranceId) },
+    { $set: req.body }
+  );
+  notifyUpdate();
+  res.sendStatus(200);
+});
 server.listen(5000, () => console.log("Server running on 5000"));
