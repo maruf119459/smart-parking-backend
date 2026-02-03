@@ -167,4 +167,22 @@ app.patch("/api/slots-update-slotNumber-vehicleType/:id", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+//delete slot api
+app.delete("/api/slots/:id", async (req, res) => {
+    try {
+        const result = await db.collection("slots").deleteOne({
+            _id: new ObjectId(req.params.id)
+        });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ message: "Slot not found" });
+        }
+
+        res.json({ message: "Slot deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 server.listen(5000, () => console.log("Server running on 5000"));
