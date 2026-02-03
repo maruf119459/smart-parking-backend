@@ -215,4 +215,27 @@ app.get("/api/slots/available", async (req, res) => {
 });
 
 
+// Parking Management
+// Parking Booking Api
+app.post("/api/parking/book", async (req, res) => {
+    const data = {
+        uid: req.body.uid,   
+        vehicleType: req.body.vehicleType,
+        name: req.body.name,
+        email: req.body.email,
+        phone: req.body.phone,
+        slotNumber: null,
+        booking_time: new Date(),
+        entryTime: null,
+        exitTime: null,
+        paidAmount: null,
+        status: "inital"
+    };
+
+    await db.collection("parking").insertOne(data);
+    notifyUpdate();
+    res.sendStatus(201);
+});
+
+
 server.listen(5000, () => console.log("Server running on 5000"));
