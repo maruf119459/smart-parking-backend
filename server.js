@@ -58,3 +58,21 @@ app.post("/api/slots", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get("/api/slots", async (req, res) => {
+  try {
+    const slots = await db
+      .collection("slots")
+      .find({})
+      .sort({ slotNumber: 1 }) // optional: sort A → Z
+      .toArray();
+
+    res.status(200).json(slots);
+  } catch (err) {
+    console.error("Get slots error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+server.listen(5000, () => console.log("Server running on 5000"));
