@@ -126,5 +126,45 @@ app.patch("/api/slots-status-update/:slotId", async (req, res) => {
   }
 });
 
+//update slot slotNumber and vehicleType api
+app.patch("/api/slots-update-slotNumber-vehicleType/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { slotNumber, vehicleType } = req.body;
 
+        // Build update object dynamically
+        const updates = {};
+
+        if (slotNumber !== undefined) {
+            updates.slotNumber = slotNumber;
+        }
+
+        if (vehicleType !== undefined) {
+            updates.vehicleType = vehicleType;
+        }
+
+        // Nothing valid to update
+        if (Object.keys(updates).length === 0) {
+            return res
+                .status(400)
+                .json({ message: "Only slotNumber or vehicleType can be updated" });
+        }
+
+        const result = await db.collection("slots").updateOne(
+            { _id: new ObjectId(id) },
+            { $set: updates }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ message: "Slot not found" });
+        }
+
+        res.json({
+            message: "Slot updated successfully",
+            updatedFields: updates
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
