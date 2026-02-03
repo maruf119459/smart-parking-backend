@@ -59,6 +59,8 @@ app.post("/api/slots", async (req, res) => {
   }
 });
 
+
+//get all slots api
 app.get("/api/slots", async (req, res) => {
   try {
     const slots = await db
@@ -71,6 +73,56 @@ app.get("/api/slots", async (req, res) => {
   } catch (err) {
     console.error("Get slots error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+//update slot status api
+app.patch("/api/slots-status-update/:slotId", async (req, res) => {
+  try {
+    const { slotId } = req.params;
+    const { status } = req.body;
+
+    console.log("slot id: "+slotId)
+
+    // 1️⃣ Validate ObjectId
+    if (!ObjectId.isValid(slotId)) {
+      return res.status(400).json({ message: "Invalid slotId" });
+    }
+
+    // 2️⃣ Validate status
+    if (!status) {
+      return res.status(400).json({ message: "Status is required" });
+    }
+
+    // (optional) restrict allowed values
+    const allowedStatus = ["free", "booked"];
+    if (!allowedStatus.includes(status)) {
+      return res.status(400).json({
+        message: `Status must be one of: ${allowedStatus.join(", ")}`
+      });
+    }
+
+    // 3️⃣ Update
+    const result = await db.collection("slots").updateOne(
+      { _id: new ObjectId(slotId) },
+      { $set: { status } }
+    );
+
+    // 4️⃣ Ensure document exists
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Slot not found" });
+    }
+
+    notifyUpdate();
+
+    return res.status(200).json({
+      message: "Slot status updated successfully",
+      modified: result.modifiedCount
+    });
+
+  } catch (err) {
+    console.error("Slot status update error:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
