@@ -403,4 +403,28 @@ app.get("/api/admin", async (req, res) => {
     }
 });
 
+// Get Single Admin Details
+app.get("/api/admin/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ error: "Invalid admin ID" });
+        }
+
+        const admin = await db
+            .collection("admininfo")
+            .findOne({ _id: new ObjectId(id) });
+
+        if (!admin) {
+            return res.status(404).json({ error: "Admin not found" });
+        }
+
+        res.json(admin);
+    } catch (err) {
+        console.error("Get admin by ID error:", err);
+        res.status(500).json({ error: "Failed to fetch admin" });
+    }
+});
+
 server.listen(5000, () => console.log("Server running on 5000"));
