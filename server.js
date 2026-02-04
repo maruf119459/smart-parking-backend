@@ -345,4 +345,11 @@ app.post("/api/qr/entrance", async (req, res) => {
     const qr = await QRCode.toDataURL(qrData);
     res.json({ qr });
 });
+
+// Exit QR Code Genaration 
+app.post("/api/qr/exit", async (req, res) => {
+    const qrData = JSON.stringify({ entranceId: req.body.entranceId });
+    const qr = await QRCode.toDataURL(qrData);
+    res.json({ qr });
+});
 server.listen(5000, () => console.log("Server running on 5000"));
