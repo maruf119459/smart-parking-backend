@@ -352,4 +352,21 @@ app.post("/api/qr/exit", async (req, res) => {
     const qr = await QRCode.toDataURL(qrData);
     res.json({ qr });
 });
+
+// QR Code Decode API
+const jsQR = require("jsqr");
+const { createCanvas, loadImage } = require("canvas");
+app.post("/api/qr/decode", async (req, res) => {
+    const img = await loadImage(req.body.image);
+    const canvas = createCanvas(img.width, img.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    const code = jsQR(imageData.data, img.width, img.height);
+
+    res.json(code ? JSON.parse(code.data) : null);
+});
+
+
 server.listen(5000, () => console.log("Server running on 5000"));
