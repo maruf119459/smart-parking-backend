@@ -368,7 +368,7 @@ app.post("/api/qr/decode", async (req, res) => {
     res.json(code ? JSON.parse(code.data) : null);
 });
 
-// AdminManagementSystem
+// AdminManagementFeature
 // Add New Admin API
 app.post("/api/admin", async (req, res) => {
     try {
