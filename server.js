@@ -335,4 +335,14 @@ app.get("/api/parking/times", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// QR Code
+const QRCode = require("qrcode");
+
+// Entrance QR Code Genaration
+app.post("/api/qr/entrance", async (req, res) => {
+    const qrData = JSON.stringify(req.body);
+    const qr = await QRCode.toDataURL(qrData);
+    res.json({ qr });
+});
 server.listen(5000, () => console.log("Server running on 5000"));
