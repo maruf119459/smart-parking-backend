@@ -368,5 +368,28 @@ app.post("/api/qr/decode", async (req, res) => {
     res.json(code ? JSON.parse(code.data) : null);
 });
 
+// AdminManagementSystem
+// Add New Admin API
+app.post("/api/admin", async (req, res) => {
+    try {
+        const { name, email, phone } = req.body;
+
+        if (!name || !email || !phone) {
+            return res.status(400).json({ error: "name, email, and phone are required" });
+        }
+
+        const exists = await db.collection("admininfo").findOne({ email });
+        if (exists) {
+            return res.status(409).json({ error: "Admin with this email already exists" });
+        }
+        const result = await db.collection("admininfo").
+            insertOne({ name, email, phone, createdAt: new Date() });
+        res.status(201).json({ message: "Admin added successfully", adminId: result.insertedId });
+    } catch (err) {
+        console.error("Add admin error:", err);
+        res.status(500).json({ error: "Failed to add admin" });
+    }
+});
+
 
 server.listen(5000, () => console.log("Server running on 5000"));
