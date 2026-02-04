@@ -391,5 +391,16 @@ app.post("/api/admin", async (req, res) => {
     }
 });
 
+// Get All Amdmin
+app.get("/api/admin", async (req, res) => {
+    try {
+        const admins = await db.collection("admininfo").
+            find({}).sort({ createdAt: -1 }).toArray();
+        res.json(admins);
+    } catch (err) {
+        console.error("Get admins error:", err);
+        res.status(500).json({ error: "Failed to fetch admins" });
+    }
+});
 
 server.listen(5000, () => console.log("Server running on 5000"));
