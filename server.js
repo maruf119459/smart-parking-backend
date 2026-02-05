@@ -609,4 +609,21 @@ app.patch("/api/charge-control/:id", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Delete Vehicle and It's Charge
+app.delete("/api/charge-control/:id", async (req, res) => {
+    try {
+        const result = await db.collection("chargeControls").deleteOne({
+            _id: new ObjectId(req.params.id)
+        });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ message: "Charge control not found" });
+        }
+
+        res.json({ message: "Charge control deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
