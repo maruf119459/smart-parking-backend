@@ -585,4 +585,28 @@ app.get("/api/charge-control", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Update Charge or Vehicle
+app.patch("/api/charge-control/:id", async (req, res) => {
+    try {
+        const updates = req.body;
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ message: "No fields provided for update" });
+        }
+
+        const result = await db.collection("chargeControls").updateOne(
+            { _id: new ObjectId(req.params.id) },
+            { $set: updates }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ message: "Charge control not found" });
+        }
+
+        res.json({ message: "Charge control updated successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
