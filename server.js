@@ -681,4 +681,21 @@ app.get("/api/users/:uid", async (req, res) => {
 
     res.json(user);
 });
+
+// Update User Profile
+app.patch("/api/users/update-profile", async (req, res) => {
+    const { uid, name, phone } = req.body;
+
+    const updateFields = {};
+    if (name) updateFields.name = name;
+    if (phone) updateFields.phone = phone;
+
+    await db.collection("users").updateOne(
+        { uid },
+        { $set: updateFields }
+    );
+
+    res.json({ message: "Profile updated" });
+});
+
 server.listen(5000, () => console.log("Server running on 5000"));
