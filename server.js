@@ -698,4 +698,21 @@ app.patch("/api/users/update-profile", async (req, res) => {
     res.json({ message: "Profile updated" });
 });
 
+// Get User Parking Statstic
+app.get("/api/parking/stats/:uid", async (req, res) => {
+    const { uid } = req.params;
+
+    const sessions = await db.collection("parking")
+        .find({ uid })
+        .toArray();
+
+    const completed = sessions.filter(s => s.status === "completed").length;
+    const entranceError = sessions.filter(s => s.status === "entance_error").length;
+    const running = sessions.filter(s =>
+        ["inital", "parked", "paid", "repay"].includes(s.status)
+    ).length;
+
+    res.json({ completed, running, entranceError });
+});
+
 server.listen(5000, () => console.log("Server running on 5000"));
