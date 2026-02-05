@@ -427,4 +427,20 @@ app.get("/api/admin/:id", async (req, res) => {
     }
 });
 
+
+// Search admin by email
+app.get("/api/admin/search/:email", async (req, res) => {
+    try {
+        const { email } = req.params;
+        if (!email || email.trim() === "") {
+            return res.status(400).json({ error: "Email is required" });
+        }
+        const admin = await db.collection("admininfo").
+            findOne({ email: email.trim() });
+        return res.status(200).json({ exists: !!admin });
+    } catch (err) {
+        console.error("Search admin error:", err);
+        return res.status(500).json({ error: "Failed to search admin" });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
