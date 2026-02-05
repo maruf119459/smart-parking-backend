@@ -639,4 +639,36 @@ app.get("/api/vehicle-types", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+//UserManagementFeature
+// User Register Details Save 
+app.post("/api/users/register", async (req, res) => {
+    try {
+        const { uid, name, email, phone } = req.body;
+
+        if (!uid || !email || !name || !phone) {
+            return res.status(400).json({ message: "Invalid user data" });
+        }
+
+        const user = {
+            uid,                 // Firebase UID
+            name,
+            email,
+            phone,
+            createdAt: new Date()
+        };
+
+        const exists = await db.collection("users").findOne({ email });
+        if (exists) {
+            return res.status(409).json({ error: "This user already exists" });
+        }
+
+        await db.collection("users").insertOne(user);
+
+        res.status(201).json({ message: "User profile created" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
