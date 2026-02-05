@@ -564,4 +564,25 @@ app.post("/api/charge-control", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Get Vehicle Charge
+app.get("/api/charge-control", async (req, res) => {
+    try {
+        const { vehicleType } = req.query;
+        console.log(vehicleType)
+        if (!vehicleType) {
+            return res.status(400).json({ message: "vehicleType is required" });
+        }
+        const result = await db.collection("chargeControls")
+            .findOne({ vehicleType }, { projection: { _id: 0, chargePerMinutes: 1 } });
+
+        console.log(result);
+        if (!result) {
+            return res.status(404).json({ message: "Vehicle type not found" });
+        } res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
