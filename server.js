@@ -427,4 +427,118 @@ app.get("/api/admin/:id", async (req, res) => {
     }
 });
 
+
+// Search admin by email
+app.get("/api/admin/search/:email", async (req, res) => {
+    try {
+        const { email } = req.params;
+        if (!email || email.trim() === "") {
+            return res.status(400).json({ error: "Email is required" });
+        }
+        const admin = await db.collection("admininfo").
+            findOne({ email: email.trim() });
+        return res.status(200).json({ exists: !!admin });
+    } catch (err) {
+        console.error("Search admin error:", err);
+        return res.status(500).json({ error: "Failed to search admin" });
+    }
+});
+
+// Update User Admin UID
+app.patch("/api/admin/update-by-email", async (req, res) => {
+  try {
+    const { email, firebaseUid } = req.body;
+
+    if (!email || !firebaseUid) {
+      return res.status(400).json({
+        message: "Email and firebaseUid are required"
+      });
+    }
+
+    const result = await db.collection("admininfo").updateOne(
+      { email: email.trim().toLowerCase() },
+      {
+        $set: {
+          firebaseUid,
+          isRegistered: true,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    res.json({
+      message: "Admin info updated successfully"
+    });
+
+  } catch (err) {
+    console.error("Admin update error:", err);
+    res.status(500).json({ error: "Failed to update admin info" });
+  }
+});
+
+const admin = require("firebase-admin");
+
+// Firebase Admin Init
+admin.initializeApp({
+  credential: admin.credential.cert({
+    type: process.env.FIREBASE_TYPE,
+    project_id: process.env.FIREBASE_PROJECT_ID,
+    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), 
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    client_id: process.env.FIREBASE_CLIENT_ID,
+    auth_uri: process.env.FIREBASE_AUTH_URI,
+    token_uri: process.env.FIREBASE_TOKEN_URI,
+    auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+    client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+    universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+  })
+});
+
+// Delete Admin by id
+app.delete("/api/admin/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ObjectId
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid admin ID" });
+    }
+
+    // Find admin first (to get firebase UID)
+    const adminData = await db
+      .collection("admininfo")
+      .findOne({ _id: new ObjectId(id) });
+
+    if (!adminData) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    const firebaseUid = adminData.firebaseUid;
+    if (!firebaseUid) {
+      return res.status(400).json({ error: "Firebase UID missing" });
+    }
+
+    // Delete user from Firebase Auth
+    await admin.auth().deleteUser(firebaseUid);
+
+    // Delete from MongoDB
+    await db
+      .collection("admininfo")
+      .deleteOne({ _id: new ObjectId(id) });
+
+    res.json({
+      message: "Admin deleted from MongoDB and Firebase successfully",
+    });
+
+  } catch (err) {
+    console.error("Delete admin error:", err);
+    res.status(500).json({ error: "Failed to delete admin" });
+  }
+});
+
 server.listen(5000, () => console.log("Server running on 5000"));
