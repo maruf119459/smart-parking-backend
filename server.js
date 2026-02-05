@@ -715,4 +715,147 @@ app.get("/api/parking/stats/:uid", async (req, res) => {
     res.json({ completed, running, entranceError });
 });
 
+
+//PaymentManagementFeature
+//Payment Initial API
+const SSLCommerzPayment = require("sslcommerz-lts");
+app.post("/api/payment/init", async (req, res) => {
+    try {
+        const { parkingId, amount, name, phone, email,vehicleType } = req.body;
+
+        if (!parkingId || !amount) {
+            return res.status(400).json({ error: "parkingId & amount required" });
+        }
+
+        const tran_id = "TXN_" + Date.now();
+
+        await db.collection("payments").insertOne({
+            parkingId: new ObjectId(parkingId),
+            tran_id,
+            amount: Number(amount),
+            currency: "BDT",
+            status: "INIT",
+            createdAt: new Date(),
+            cus_name: name,
+            cus_email: email,
+            cus_phone: phone,
+            vehicleType:vehicleType
+        });
+
+        const data = {
+            total_amount: Number(amount), // MUST be number
+            currency: "BDT",
+            tran_id,
+
+            success_url: "http://localhost:5000/api/payment/success",
+            fail_url: "http://localhost:5000/api/payment/fail",
+            cancel_url: "http://localhost:5000/api/payment/cancel",
+            ipn_url: "http://localhost:5000/api/payment/ipn",
+
+            cus_name: name,
+            cus_email: email,
+            cus_phone: phone,
+            cus_add1: "Dhaka",
+            cus_city: "Dhaka",
+            cus_state: "Dhaka",
+            cus_postcode: "1207",
+            cus_country: "Bangladesh",
+
+            shipping_method: "NO",
+            ship_name: "N/A",
+            ship_add1: "N/A",
+            ship_city: "N/A",
+            ship_state: "N/A",
+            ship_postcode: "0000",
+            ship_country: "Bangladesh",
+
+            product_name: "Parking Fee",
+            product_category: "Parking",
+            product_profile: "general",
+
+            num_of_item: 1,
+
+            value_a: parkingId
+        };
+
+        const sslcz = new SSLCommerzPayment(
+            process.env.STORE_ID, process.env.API_KEY, false // sandbox
+        );
+
+        const apiResponse = await sslcz.init(data);
+
+        console.log("SSL Response:", apiResponse);
+
+        if (!apiResponse?.GatewayPageURL) {
+            return res.status(500).json({
+                error: "SSLCommerz init failed",
+                details: apiResponse
+            });
+        }
+
+        res.json(apiResponse);
+    } catch (err) {
+        console.error("Payment init error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Payment Success API
+app.post("/api/payment/success", async (req, res) => {
+    try {
+        const { tran_id, amount, value_a } = req.body;
+        console.log(value_a)
+        
+
+        await db.collection("payments").updateOne(
+            { tran_id },
+            {
+                $set: {
+                    status: "SUCCESS",
+                    paidAt: new Date()
+                }
+            }
+        );
+
+        await db.collection("parking").updateOne(
+            { _id: new ObjectId(value_a) },
+            {
+                $set: {
+                    exitTime: new Date(),
+                    status: "paid",
+                    paidAmount: Number(amount) 
+                }
+            }
+        );
+
+        notifyUpdate();
+        res.redirect("http://localhost:3000/booking");
+    } catch (err) {
+        console.error("Payment success error:", err);
+        res.redirect("http://localhost:3000/booking");
+    }
+});
+
+// Payment Failed API
+app.post("/api/payment/fail", async (req, res) => {
+    if (req.body?.tran_id) {
+        await db.collection("payments").updateOne(
+            { tran_id: req.body.tran_id },
+            { $set: { status: "FAIL" } }
+        );
+    }
+    res.redirect("http://localhost:3000/booking");
+});
+
+// Payment Cancel API
+app.post("/api/payment/cancel", async (req, res) => {
+    if (req.body?.tran_id) {
+        await db.collection("payments").updateOne(
+            { tran_id: req.body.tran_id },
+            { $set: { status: "CANCEL" } }
+        );
+    }
+    res.redirect("http://localhost:3000/booking");
+});
+
 server.listen(5000, () => console.log("Server running on 5000"));
