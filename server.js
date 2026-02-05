@@ -626,4 +626,17 @@ app.delete("/api/charge-control/:id", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Get Vehicle Types
+app.get("/api/vehicle-types", async (req, res) => {
+    try {
+        const vehicleTypes = await db
+            .collection("chargeControls")
+            .distinct("vehicleType");
+
+        res.json(vehicleTypes);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 server.listen(5000, () => console.log("Server running on 5000"));
