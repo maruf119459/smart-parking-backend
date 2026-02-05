@@ -671,4 +671,14 @@ app.post("/api/users/register", async (req, res) => {
         res.status(500).json({ message: "Server error" });
     }
 });
+
+//Get Single User Details
+app.get("/api/users/:uid", async (req, res) => {
+    const { uid } = req.params;
+
+    const user = await db.collection("users").findOne({ uid });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json(user);
+});
 server.listen(5000, () => console.log("Server running on 5000"));
