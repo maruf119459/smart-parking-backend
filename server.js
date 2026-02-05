@@ -639,4 +639,80 @@ app.get("/api/vehicle-types", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+//UserManagementFeature
+// User Register Details Save 
+app.post("/api/users/register", async (req, res) => {
+    try {
+        const { uid, name, email, phone } = req.body;
+
+        if (!uid || !email || !name || !phone) {
+            return res.status(400).json({ message: "Invalid user data" });
+        }
+
+        const user = {
+            uid,                 // Firebase UID
+            name,
+            email,
+            phone,
+            createdAt: new Date()
+        };
+
+        const exists = await db.collection("users").findOne({ email });
+        if (exists) {
+            return res.status(409).json({ error: "This user already exists" });
+        }
+
+        await db.collection("users").insertOne(user);
+
+        res.status(201).json({ message: "User profile created" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+//Get Single User Details
+app.get("/api/users/:uid", async (req, res) => {
+    const { uid } = req.params;
+
+    const user = await db.collection("users").findOne({ uid });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json(user);
+});
+
+// Update User Profile
+app.patch("/api/users/update-profile", async (req, res) => {
+    const { uid, name, phone } = req.body;
+
+    const updateFields = {};
+    if (name) updateFields.name = name;
+    if (phone) updateFields.phone = phone;
+
+    await db.collection("users").updateOne(
+        { uid },
+        { $set: updateFields }
+    );
+
+    res.json({ message: "Profile updated" });
+});
+
+// Get User Parking Statstic
+app.get("/api/parking/stats/:uid", async (req, res) => {
+    const { uid } = req.params;
+
+    const sessions = await db.collection("parking")
+        .find({ uid })
+        .toArray();
+
+    const completed = sessions.filter(s => s.status === "completed").length;
+    const entranceError = sessions.filter(s => s.status === "entance_error").length;
+    const running = sessions.filter(s =>
+        ["inital", "parked", "paid", "repay"].includes(s.status)
+    ).length;
+
+    res.json({ completed, running, entranceError });
+});
+
 server.listen(5000, () => console.log("Server running on 5000"));
