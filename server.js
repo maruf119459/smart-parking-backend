@@ -858,4 +858,90 @@ app.post("/api/payment/cancel", async (req, res) => {
     res.redirect("http://localhost:3000/booking");
 });
 
+//CustomerServiceManagementFeature
+// Customer Service API
+app.get("/api/customer-service/search", async (req, res) => {
+  try {
+    const { email, from, to } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // ---- Parking date filter (booking_time) ----
+    const parkingDateFilter = {};
+    if (from || to) {
+      parkingDateFilter.booking_time = {};
+      if (from) parkingDateFilter.booking_time.$gte = new Date(from + "T00:00:00");
+      if (to) parkingDateFilter.booking_time.$lte = new Date(to + "T23:59:59");
+    }
+
+    // ---- Payment date filter (createdAt) ----
+    const paymentDateFilter = {};
+    if (from || to) {
+      paymentDateFilter.createdAt = {};
+      if (from) paymentDateFilter.createdAt.$gte = new Date(from + "T00:00:00");
+      if (to) paymentDateFilter.createdAt.$lte = new Date(to + "T23:59:59");
+    }
+
+    // ---- Find parking records ----
+    const parkings = await db
+      .collection("parking")
+      .find({
+        email,
+        ...parkingDateFilter
+      })
+      .sort({ booking_time: -1 })
+      .toArray();
+
+    if (!parkings.length) {
+      return res.json([]);
+    }
+
+    // ---- Attach payments ----
+    const response = await Promise.all(
+      parkings.map(async (parking) => {
+        const payments = await db
+          .collection("payments")
+          .find({
+            parkingId: parking._id,
+            ...paymentDateFilter
+          })
+          .sort({ createdAt: 1 })
+          .toArray();
+
+        return {
+          parkingId: parking._id,
+          vehicleType: parking.vehicleType,
+          slotNumber: parking.slotNumber,
+          bookingTime: parking.booking_time,
+          entryTime: parking.entryTime,
+          exitTime: parking.exitTime,
+          paidAmount: parking.paidAmount,
+          parkingStatus: parking.status,
+          customer: {
+            name: parking.name,
+            email: parking.email,
+            phone: parking.phone
+          },
+          payments: payments.map(p => ({
+            transactionId: p.tran_id,
+            amount: p.amount ?? null,
+            currency: p.currency,
+            status: p.status,
+            createdAt: p.createdAt,
+            paidAt: p.paidAt ?? null
+          }))
+        };
+      })
+    );
+
+    res.json(response);
+
+  } catch (err) {
+    console.error("Customer service search error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 server.listen(5000, () => console.log("Server running on 5000"));
