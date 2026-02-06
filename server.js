@@ -944,4 +944,113 @@ app.get("/api/customer-service/search", async (req, res) => {
   }
 });
 
+//AdminDashboardManagementFeature
+function getGroupType(start, end) {
+  const diffDays =
+    (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+
+  if (diffDays <= 7) return "day";
+  if (diffDays <= 30) return "week";
+  if (diffDays <= 365) return "month";
+  return "year";
+}
+
+//Admin Dashboard API
+app.get("/api/admin/dashboard", async (req, res) => {
+  try {
+    let { from, to } = req.query;
+
+    // DEFAULT DATE RANGE (last 7 days)
+    const end = to ? new Date(to) : new Date();
+    const start = from
+      ? new Date(from)
+      : new Date(new Date().setDate(end.getDate() - 7));
+
+    if (isNaN(start) || isNaN(end)) {
+      return res.status(400).json({ error: "Invalid date format" });
+    }
+
+    // include full end day
+    end.setHours(23, 59, 59, 999);
+
+    const groupType = getGroupType(start, end);
+
+    const groupFormat = {
+      day: "%Y-%m-%d",
+      week: "%Y-%U",
+      month: "%Y-%m",
+      year: "%Y"
+    }[groupType];
+
+    /* ================= USERS ================= */
+    const usersData = await db.collection("users").aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: groupFormat, date: "$createdAt" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]).toArray();
+
+    /* ================= INCOME BY VEHICLE ================= */
+    const incomeByVehicle = await db.collection("payments").aggregate([
+      {
+        $match: {
+          status: "SUCCESS",
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: "$vehicleType",
+          total: { $sum: "$amount" }
+        }
+      }
+    ]).toArray();
+
+    /* ================= PARKING STATUS ================= */
+    const parkingStatus = await db.collection("parking").aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]).toArray();
+
+    /* ================= INCOME TIMELINE ================= */
+    const incomeTimeline = await db.collection("payments").aggregate([
+      {
+        $match: {
+          status: "SUCCESS",
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: groupFormat, date: "$createdAt" } },
+          total: { $sum: "$amount" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]).toArray();
+
+    res.json({
+      range: { from: start, to: end },
+      groupType,
+      usersData,
+      incomeByVehicle,
+      parkingStatus,
+      incomeTimeline
+    });
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    res.status(500).json({ error: "Dashboard data failed" });
+  }
+});
+
+
 server.listen(5000, () => console.log("Server running on 5000"));
