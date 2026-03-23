@@ -128,7 +128,7 @@ app.patch("/api/slots-status-update/:slotId", async (req, res) => {
 });
 
 //update slot slotNumber and vehicleType api
-app.patch("/api/slots-update-slotNumber-vehicleType/:id", async (req, res) => {
+app.patch("/api/slots-update-slotNumber-vehicleType/:id",verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { slotNumber, vehicleType } = req.body;
@@ -170,7 +170,7 @@ app.patch("/api/slots-update-slotNumber-vehicleType/:id", async (req, res) => {
 });
 
 //delete slot api
-app.delete("/api/slots/:id", async (req, res) => {
+app.delete("/api/slots/:id",verifyToken, async (req, res) => {
     try {
         const result = await db.collection("slots").deleteOne({
             _id: new ObjectId(req.params.id)
@@ -187,7 +187,7 @@ app.delete("/api/slots/:id", async (req, res) => {
 });
 
 //get available slots count by vehicle type api
-app.get("/api/slots/available", async (req, res) => {
+app.get("/api/slots/available",verifyToken, async (req, res) => {
     try {
         const result = await db
             .collection("slots")
@@ -218,7 +218,7 @@ app.get("/api/slots/available", async (req, res) => {
 
 // Parking Management
 // Parking Booking Api
-app.post("/api/parking/book", async (req, res) => {
+app.post("/api/parking/book",verifyToken, async (req, res) => {
     const data = {
         uid: req.body.uid,
         vehicleType: req.body.vehicleType,
@@ -239,7 +239,7 @@ app.post("/api/parking/book", async (req, res) => {
 });
 
 // User Current Parking
-app.get("/api/parking/user-current-parking", async (req, res) => {
+app.get("/api/parking/user-current-parking",verifyToken, async (req, res) => {
     try {
         const { uid } = req.query;
 
@@ -376,14 +376,14 @@ app.get("/api/parking/times", async (req, res) => {
 const QRCode = require("qrcode");
 
 // Entrance QR Code Genaration
-app.post("/api/qr/entrance", async (req, res) => {
+app.post("/api/qr/entrance",verifyToken, async (req, res) => {
     const qrData = JSON.stringify(req.body);
     const qr = await QRCode.toDataURL(qrData);
     res.json({ qr });
 });
 
 // Exit QR Code Genaration 
-app.post("/api/qr/exit", async (req, res) => {
+app.post("/api/qr/exit",verifyToken, async (req, res) => {
     const qrData = JSON.stringify({ entranceId: req.body.entranceId });
     const qr = await QRCode.toDataURL(qrData);
     res.json({ qr });
@@ -406,9 +406,10 @@ app.post("/api/qr/decode", async (req, res) => {
 
 // AdminManagementFeature
 // Add New Admin API
-app.post("/api/admin", async (req, res) => {
+app.post("/api/admin",verifyToken, async (req, res) => {
     try {
         const { name, email, phone } = req.body;
+        const role = "general"
 
         if (!name || !email || !phone) {
             return res.status(400).json({ error: "name, email, and phone are required" });
@@ -430,7 +431,7 @@ app.post("/api/admin", async (req, res) => {
 });
 
 // Get All Amdmin
-app.get("/api/admin", async (req, res) => {
+app.get("/api/admin",verifyToken, async (req, res) => {
     try {
         const admins = await db.collection("admininfo").
             find({}).sort({ createdAt: -1 }).toArray();
@@ -442,7 +443,7 @@ app.get("/api/admin", async (req, res) => {
 });
 
 // Get Single Admin Details
-app.get("/api/admin/:id", async (req, res) => {
+app.get("/api/admin/:id",verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -582,7 +583,7 @@ app.delete("/api/admin/:id", async (req, res) => {
 
 //ChargeManagementFeature
 //Add New Vehicle and It's Charge
-app.post("/api/charge-control", async (req, res) => {
+app.post("/api/charge-control",verifyToken, async (req, res) => {
     try {
         const { vehicleType, chargingRate } = req.body;
 
@@ -605,7 +606,7 @@ app.post("/api/charge-control", async (req, res) => {
 });
 
 // Get Vehicle Charge
-app.get("/api/charge-control", async (req, res) => {
+app.get("/api/charge-control",verifyToken, async (req, res) => {
     try {
         const { vehicleType } = req.query;
         console.log("app.get(`/api/charge-control`,", vehicleType);
@@ -644,7 +645,7 @@ app.get("/api/vehicle-types-and-charges", async (req, res) => {
 });
 
 // Update Charge or Vehicle
-app.patch("/api/charge-control/:id", async (req, res) => {
+app.patch("/api/charge-control/:id",verifyToken, async (req, res) => {
     try {
         const updates = req.body;
 
@@ -668,7 +669,7 @@ app.patch("/api/charge-control/:id", async (req, res) => {
 });
 
 // Delete Vehicle and It's Charge
-app.delete("/api/charge-control/:id", async (req, res) => {
+app.delete("/api/charge-control/:id",verifyToken, async (req, res) => {
     try {
         const result = await db.collection("chargeControls").deleteOne({
             _id: new ObjectId(req.params.id)
@@ -685,7 +686,7 @@ app.delete("/api/charge-control/:id", async (req, res) => {
 });
 
 // Get Vehicle Types
-app.get("/api/vehicle-types", async (req, res) => {
+app.get("/api/vehicle-types",verifyToken, async (req, res) => {
     try {
         const vehicleTypes = await db
             .collection("chargeControls")
@@ -735,7 +736,7 @@ app.post("/api/users/register", async (req, res) => {
 });
 
 //Get Single User Details
-app.get("/api/users/:uid", async (req, res) => {
+app.get("/api/users/:uid",verifyToken, async (req, res) => {
     const { uid } = req.params;
 
     const user = await db.collection("users").findOne({ uid });
@@ -745,7 +746,7 @@ app.get("/api/users/:uid", async (req, res) => {
 });
 
 // Update User Profile
-app.patch("/api/users/update-profile", async (req, res) => {
+app.patch("/api/users/update-profile",verifyToken, async (req, res) => {
     const { uid, name, phone } = req.body;
 
     const updateFields = {};
@@ -761,7 +762,7 @@ app.patch("/api/users/update-profile", async (req, res) => {
 });
 
 // Get User Parking Statstic
-app.get("/api/parking/stats/:uid", async (req, res) => {
+app.get("/api/parking/stats/:uid",verifyToken, async (req, res) => {
     const { uid } = req.params;
 
     const sessions = await db.collection("parking")
