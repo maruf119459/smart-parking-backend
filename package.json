@@ -1,0 +1,29 @@
+{
+  "name": "smart-parking-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "canvas": "^3.2.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "firebase": "^12.8.0",
+    "firebase-admin": "^13.6.1",
+    "jsonwebtoken": "^9.0.3",
+    "jsqr": "^1.4.0",
+    "mongodb": "^7.0.0",
+    "qrcode": "^1.5.4",
+    "react-router-dom": "^7.13.0",
+    "socket.io": "^4.8.3",
+    "sslcommerz-lts": "^1.2.0"
+  }
+}
