@@ -817,14 +817,14 @@ app.post("/api/payment/init", async (req, res) => {
         });
 
         const data = {
-            total_amount: Number(amount), // MUST be number
+            total_amount: Number(amount), 
             currency: "BDT",
             tran_id,
 
-            success_url: "http://localhost:5000/api/payment/success",
-            fail_url: "http://localhost:5000/api/payment/fail",
-            cancel_url: "http://localhost:5000/api/payment/cancel",
-            ipn_url: "http://localhost:5000/api/payment/ipn",
+            success_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/success",
+            fail_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/fail",
+            cancel_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/cancel",
+            ipn_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/ipn",
 
             cus_name: name,
             cus_email: email,
@@ -853,7 +853,7 @@ app.post("/api/payment/init", async (req, res) => {
         };
 
         const sslcz = new SSLCommerzPayment(
-            process.env.STORE_ID, process.env.API_KEY, false // sandbox
+            process.env.STORE_ID, process.env.API_KEY, false 
         );
 
         const apiResponse = await sslcz.init(data);
@@ -922,10 +922,10 @@ app.post("/api/payment/success", async (req, res) => {
 
         notifyUpdate();
 
-        res.redirect("http://localhost:3000/booking");
+        res.redirect("https://city-parking.onrender.com/booking");
     } catch (err) {
         console.error("Payment success error:", err);
-        res.redirect("http://localhost:3000/booking");
+        res.redirect("https://city-parking.onrender.com/booking");
     }
 });
 
@@ -947,7 +947,7 @@ app.post("/api/payment/fail", async (req, res) => {
             }
         );
     }
-    res.redirect("http://localhost:3000/booking");
+    res.redirect("https://city-parking.onrender.com/booking");
 });
 
 // Payment Cancel API
@@ -958,7 +958,7 @@ app.post("/api/payment/cancel", async (req, res) => {
             { $set: { status: "CANCEL" } }
         );
     }
-    res.redirect("http://localhost:3000/booking");
+    res.redirect("https://city-parking.onrender.com/booking");
 });
 
 // Get Payments by Parking ID (Only SUCCESS payments)
