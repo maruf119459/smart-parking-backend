@@ -10,12 +10,12 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: "*", 
+        origin: "*",
         methods: ["GET", "POST"],
         credentials: true
     },
-    transports: ['websocket', 'polling'], 
-    allowEIO3: true 
+    transports: ['websocket', 'polling'],
+    allowEIO3: true
 });
 
 app.use(cors());
@@ -42,7 +42,7 @@ function notifyUpdate() {
     io.emit("db_update");
 }
 
-app.get("/", (req, res) => {   
+app.get("/", (req, res) => {
     res.send("Smart Parking System API is running");
 });
 
@@ -139,7 +139,7 @@ app.patch("/api/slots-status-update/:slotId", async (req, res) => {
 });
 
 //update slot slotNumber and vehicleType api
-app.patch("/api/slots-update-slotNumber-vehicleType/:id",  async (req, res) => {
+app.patch("/api/slots-update-slotNumber-vehicleType/:id", async (req, res) => {
     try {
         const { id } = req.params;
         const { slotNumber, vehicleType } = req.body;
@@ -181,7 +181,7 @@ app.patch("/api/slots-update-slotNumber-vehicleType/:id",  async (req, res) => {
 });
 
 //delete slot api
-app.delete("/api/slots/:id",  async (req, res) => {
+app.delete("/api/slots/:id", async (req, res) => {
     try {
         const result = await db.collection("slots").deleteOne({
             _id: new ObjectId(req.params.id)
@@ -198,7 +198,7 @@ app.delete("/api/slots/:id",  async (req, res) => {
 });
 
 //get available slots count by vehicle type api
-app.get("/api/slots/available",  async (req, res) => {
+app.get("/api/slots/available", async (req, res) => {
     try {
         const result = await db
             .collection("slots")
@@ -229,7 +229,7 @@ app.get("/api/slots/available",  async (req, res) => {
 
 // Parking Management
 // Parking Booking Api
-app.post("/api/parking/book",  async (req, res) => {
+app.post("/api/parking/book", async (req, res) => {
     const data = {
         uid: req.body.uid,
         vehicleType: req.body.vehicleType,
@@ -250,7 +250,7 @@ app.post("/api/parking/book",  async (req, res) => {
 });
 
 // User Current Parking
-app.get("/api/parking/user-current-parking",  async (req, res) => {
+app.get("/api/parking/user-current-parking", async (req, res) => {
     try {
         const { uid } = req.query;
 
@@ -289,8 +289,8 @@ app.get("/api/parking/user-history", async (req, res) => {
 
         if (startDate && endDate) {
             query.booking_time = {
-                $gte: new Date(startDate), 
-                $lte: new Date(endDate)    
+                $gte: new Date(startDate),
+                $lte: new Date(endDate)
             };
         }
 
@@ -387,14 +387,14 @@ app.get("/api/parking/times", async (req, res) => {
 const QRCode = require("qrcode");
 
 // Entrance QR Code Genaration
-app.post("/api/qr/entrance",  async (req, res) => {
+app.post("/api/qr/entrance", async (req, res) => {
     const qrData = JSON.stringify(req.body);
     const qr = await QRCode.toDataURL(qrData);
     res.json({ qr });
 });
 
 // Exit QR Code Genaration 
-app.post("/api/qr/exit",  async (req, res) => {
+app.post("/api/qr/exit", async (req, res) => {
     const qrData = JSON.stringify({ entranceId: req.body.entranceId });
     const qr = await QRCode.toDataURL(qrData);
     res.json({ qr });
@@ -417,7 +417,7 @@ app.post("/api/qr/decode", async (req, res) => {
 
 // AdminManagementFeature
 // Add New Admin API
-app.post("/api/admin",  async (req, res) => {
+app.post("/api/admin", async (req, res) => {
     try {
         const { name, email, phone } = req.body;
         const role = "general"
@@ -442,7 +442,7 @@ app.post("/api/admin",  async (req, res) => {
 });
 
 // Get All Amdmin
-app.get("/api/admin",  async (req, res) => {
+app.get("/api/admin", async (req, res) => {
     try {
         const admins = await db.collection("admininfo").
             find({}).sort({ createdAt: -1 }).toArray();
@@ -454,7 +454,7 @@ app.get("/api/admin",  async (req, res) => {
 });
 
 // Get Single Admin Details
-app.get("/api/admin/:id",  async (req, res) => {
+app.get("/api/admin/:id", async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -594,7 +594,7 @@ app.delete("/api/admin/:id", async (req, res) => {
 
 //ChargeManagementFeature
 //Add New Vehicle and It's Charge
-app.post("/api/charge-control",  async (req, res) => {
+app.post("/api/charge-control", async (req, res) => {
     try {
         const { vehicleType, chargingRate } = req.body;
 
@@ -617,7 +617,7 @@ app.post("/api/charge-control",  async (req, res) => {
 });
 
 // Get Vehicle Charge
-app.get("/api/charge-control",  async (req, res) => {
+app.get("/api/charge-control", async (req, res) => {
     try {
         const { vehicleType } = req.query;
         console.log("app.get(`/api/charge-control`,", vehicleType);
@@ -656,7 +656,7 @@ app.get("/api/vehicle-types-and-charges", async (req, res) => {
 });
 
 // Update Charge or Vehicle
-app.patch("/api/charge-control/:id",  async (req, res) => {
+app.patch("/api/charge-control/:id", async (req, res) => {
     try {
         const updates = req.body;
 
@@ -680,7 +680,7 @@ app.patch("/api/charge-control/:id",  async (req, res) => {
 });
 
 // Delete Vehicle and It's Charge
-app.delete("/api/charge-control/:id",  async (req, res) => {
+app.delete("/api/charge-control/:id", async (req, res) => {
     try {
         const result = await db.collection("chargeControls").deleteOne({
             _id: new ObjectId(req.params.id)
@@ -697,7 +697,7 @@ app.delete("/api/charge-control/:id",  async (req, res) => {
 });
 
 // Get Vehicle Types
-app.get("/api/vehicle-types",  async (req, res) => {
+app.get("/api/vehicle-types", async (req, res) => {
     try {
         const vehicleTypes = await db
             .collection("chargeControls")
@@ -747,7 +747,7 @@ app.post("/api/users/register", async (req, res) => {
 });
 
 //Get Single User Details
-app.get("/api/users/:uid",  async (req, res) => {
+app.get("/api/users/:uid", async (req, res) => {
     const { uid } = req.params;
 
     const user = await db.collection("users").findOne({ uid });
@@ -757,7 +757,7 @@ app.get("/api/users/:uid",  async (req, res) => {
 });
 
 // Update User Profile
-app.patch("/api/users/update-profile",  async (req, res) => {
+app.patch("/api/users/update-profile", async (req, res) => {
     const { uid, name, phone } = req.body;
 
     const updateFields = {};
@@ -773,7 +773,7 @@ app.patch("/api/users/update-profile",  async (req, res) => {
 });
 
 // Get User Parking Statstic
-app.get("/api/parking/stats/:uid",  async (req, res) => {
+app.get("/api/parking/stats/:uid", async (req, res) => {
     const { uid } = req.params;
 
     const sessions = await db.collection("parking")
@@ -817,7 +817,7 @@ app.post("/api/payment/init", async (req, res) => {
         });
 
         const data = {
-            total_amount: Number(amount), 
+            total_amount: Number(amount),
             currency: "BDT",
             tran_id,
 
@@ -853,7 +853,7 @@ app.post("/api/payment/init", async (req, res) => {
         };
 
         const sslcz = new SSLCommerzPayment(
-            process.env.STORE_ID, process.env.API_KEY, false 
+            process.env.STORE_ID, process.env.API_KEY, false
         );
 
         const apiResponse = await sslcz.init(data);
@@ -960,6 +960,178 @@ app.post("/api/payment/cancel", async (req, res) => {
     }
     res.redirect("https://city-parking.onrender.com/booking");
 });
+
+//AndroidPaymentManagementFeature
+//Android Payment Initial API 
+const APP_REDIRECT_URL = "com.smart.city.parking://booking";
+app.post("/api/apk/payment/init", async (req, res) => {
+    try {
+        const { parkingId, amount, name, phone, email, vehicleType } = req.body;
+
+        if (!parkingId || !amount) {
+            return res.status(400).json({ error: "parkingId & amount required" });
+        }
+
+        const tran_id = "TXN_" + Date.now();
+
+        await db.collection("payments").insertOne({
+            parkingId: new ObjectId(parkingId),
+            tran_id,
+            amount: Number(amount),
+            currency: "BDT",
+            status: "INIT",
+            createdAt: new Date(),
+            cus_name: name,
+            cus_email: email,
+            cus_phone: phone,
+            vehicleType: vehicleType
+        });
+
+        const data = {
+            total_amount: Number(amount),
+            currency: "BDT",
+            tran_id,
+
+            success_url: "https://smart-parking-backend-u47b.onrender.com/api/apk/payment/success",
+            fail_url: "https://smart-parking-backend-u47b.onrender.com/api/apk/payment/fail",
+            cancel_url: "https://smart-parking-backend-u47b.onrender.com/api/apk/payment/cancel",
+            ipn_url: "https://smart-parking-backend-u47b.onrender.com/api/apk/payment/ipn",
+
+            cus_name: name,
+            cus_email: email,
+            cus_phone: phone,
+            cus_add1: "Dhaka",
+            cus_city: "Dhaka",
+            cus_state: "Dhaka",
+            cus_postcode: "1207",
+            cus_country: "Bangladesh",
+
+            shipping_method: "NO",
+            ship_name: "N/A",
+            ship_add1: "N/A",
+            ship_city: "N/A",
+            ship_state: "N/A",
+            ship_postcode: "0000",
+            ship_country: "Bangladesh",
+
+            product_name: "Parking Fee",
+            product_category: "Parking",
+            product_profile: "general",
+
+            num_of_item: 1,
+
+            value_a: parkingId
+        };
+
+        const sslcz = new SSLCommerzPayment(
+            process.env.STORE_ID, process.env.API_KEY, false
+        );
+
+        const apiResponse = await sslcz.init(data);
+
+        console.log("SSL Response:", apiResponse);
+
+        if (!apiResponse?.GatewayPageURL) {
+            return res.status(500).json({
+                error: "SSLCommerz init failed",
+                details: apiResponse
+            });
+        }
+
+        res.json(apiResponse);
+    } catch (err) {
+        console.error("Payment init error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Payment Success API
+app.post("/api/apk/payment/success", async (req, res) => {
+    try {
+        const paymentData = req.body;
+
+        if (!req.body) {
+            throw new Error("No body received from SSLCommerz");
+        }
+
+        const { tran_id, amount, value_a } = req.body || {};
+
+        if (!tran_id) {
+            throw new Error("tran_id missing in response");
+        }
+
+        if (paymentData.card_brand === "IB") {
+            paymentData.card_brand = "INTERNETBANKING";
+        }
+
+        await db.collection("payments").updateOne(
+            { tran_id },
+            {
+                $set: {
+                    status: "SUCCESS",
+                    paidAt: new Date(),
+                    bankName: paymentData.card_issuer,
+                    accountType: paymentData.card_brand,
+                }
+            }
+        );
+
+        const exitTime = new Date();
+        exitTime.setMinutes(exitTime.getMinutes() + 10);
+
+        await db.collection("parking").updateOne(
+            { _id: new ObjectId(value_a) },
+            {
+                $set: {
+                    exitTime: exitTime,
+                    status: "paid",
+                    paidAmount: Number(amount),
+                    paidAt: new Date(),
+                }
+            }
+        );
+
+        notifyUpdate();
+
+        res.redirect(APP_REDIRECT_URL);
+    } catch (err) {
+        console.error("Payment success error:", err);
+        res.redirect(APP_REDIRECT_URL);
+    }
+});
+
+// Payment Failed API
+app.post("/api/apk/payment/fail", async (req, res) => {
+    const paymentData = req.body;
+    if (paymentData.card_brand === "IB") {
+        paymentData.card_brand = "INTERNETBANKING";
+    }
+    if (req.body?.tran_id) {
+        await db.collection("payments").updateOne(
+            { tran_id: req.body.tran_id },
+            {
+                $set: {
+                    status: "FAIL",
+                    card_issuer: paymentData.card_issuer,
+                    card_brand: paymentData.card_brand,
+                }
+            }
+        );
+    }
+    res.redirect(APP_REDIRECT_URL);
+});
+
+// Payment Cancel API
+app.post("/api/apk/payment/cancel", async (req, res) => {
+    if (req.body?.tran_id) {
+        await db.collection("payments").updateOne(
+            { tran_id: req.body.tran_id },
+            { $set: { status: "CANCEL" } }
+        );
+    }
+    res.redirect(APP_REDIRECT_URL);
+});
+
 
 // Get Payments by Parking ID (Only SUCCESS payments)
 app.get("/api/payments/:parkingId", async (req, res) => {
@@ -1185,33 +1357,33 @@ app.get("/api/admin/analytics/popular-slots", async (req, res) => {
 
 // 7. Payment Methods
 app.get("/api/admin/analytics/payment-methods", async (req, res) => {
-  try {
-    const { dateFrom, dateTo } = parseDates(req);
+    try {
+        const { dateFrom, dateTo } = parseDates(req);
 
-    const data = await db.collection("payments").aggregate([
-      {
-        $match: {
-          status: "SUCCESS",
-          createdAt: { $gte: dateFrom, $lte: dateTo },
-          accountType: { $exists: true, $ne: null }
-        }
-      },
-      {
-        $group: {
-          _id: "$accountType",
-          value: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { value: -1 }
-      }
-    ]).toArray();
+        const data = await db.collection("payments").aggregate([
+            {
+                $match: {
+                    status: "SUCCESS",
+                    createdAt: { $gte: dateFrom, $lte: dateTo },
+                    accountType: { $exists: true, $ne: null }
+                }
+            },
+            {
+                $group: {
+                    _id: "$accountType",
+                    value: { $sum: 1 }
+                }
+            },
+            {
+                $sort: { value: -1 }
+            }
+        ]).toArray();
 
-    res.json(data);
+        res.json(data);
 
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
 });
 
 // 8. Transaction Status Ratio
