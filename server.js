@@ -8,21 +8,6 @@ const { MongoClient, ObjectId } = require("mongodb");
 const app = express();
 const server = http.createServer(app);
 
-const io = new Server(server, {
-    cors: {
-        origin: [
-            "https://city-parking.onrender.com",
-            "https://city-parking-admin.onrender.com",
-            "http://localhost:3000",
-            "http://localhost:8000"
-        ],
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        credentials: true
-    },
-    transports: ['websocket', 'polling'],
-    allowEIO3: true
-});
-
 const allowedOrigins = [
     "https://city-parking.onrender.com",
     "https://city-parking-admin.onrender.com",
@@ -30,8 +15,26 @@ const allowedOrigins = [
     "http://localhost:8000"
 ];
 
+const io = new Server(server, {
+    cors: {
+        origin: (origin, callback) => {
+            if (!origin || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
+        },
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    pingTimeout: 60000, 
+    pingInterval: 25000
+});
+
 app.use(cors({
-    origin: function (origin, callback) {
+    origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
