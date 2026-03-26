@@ -12,7 +12,13 @@ const allowedOrigins = [
     "https://city-parking.onrender.com",
     "https://city-parking-admin.onrender.com",
     "http://localhost:3000",
-    "http://localhost:8000"
+    "http://localhost:8000",
+    
+    "http://localhost",
+    "capacitor://localhost", 
+    
+    "file://",
+    "http://localhost:8080" 
 ];
 
 const io = new Server(server, {
@@ -38,7 +44,7 @@ app.use(cors({
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            callback(new Error('CORS Error: Origin not allowed'));
         }
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
