@@ -18,7 +18,9 @@ const allowedOrigins = [
     "capacitor://localhost", 
     
     "file://",
-    "http://localhost:8080" 
+    "http://localhost:8080",
+
+    "https://smart-parking-backend-u47b.onrender.com"
 ];
 
 const io = new Server(server, {
