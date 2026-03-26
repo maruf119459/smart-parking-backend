@@ -10,15 +10,38 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
+        origin: [
+            "https://city-parking.onrender.com",
+            "https://city-parking-admin.onrender.com",
+            "http://localhost:3000",
+            "http://localhost:8000"
+        ],
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         credentials: true
     },
     transports: ['websocket', 'polling'],
     allowEIO3: true
 });
 
-app.use(cors());
+const allowedOrigins = [
+    "https://city-parking.onrender.com",
+    "https://city-parking-admin.onrender.com",
+    "http://localhost:3000",
+    "http://localhost:8000"
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
