@@ -18,18 +18,15 @@ const allowedOrigins = [
     "http://localhost:8000",
 
     "http://localhost",
-    "capacitor://localhost", 
+    "capacitor://localhost",
 
     "file://",
     "http://localhost:8080",
-
-    "https://smart-parking-backend-u47b.onrender.com"
 ];
 
 // CORS logic to handle browser and server-to-server (SSLCommerz) requests
 const corsOptions = {
     origin: (origin, callback) => {
-        // !origin allows server-to-server POST requests (like SSLCommerz) and IoT/Mobile apps
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -52,7 +49,7 @@ const io = new Server(server, {
     cors: corsOptions,
     transports: ['websocket', 'polling'],
     allowEIO3: true,
-    pingTimeout: 60000, 
+    pingTimeout: 60000,
     pingInterval: 25000
 });
 
@@ -890,16 +887,16 @@ app.post("/api/payment/init", async (req, res) => {
         );
 
         const apiResponse = await sslcz.init(data);
+        console.log("SSL Response:", apiResponse);
 
-        if (!apiResponse?.GatewayPageURL) {
-            return res.status(500).json({
-                error: "SSLCommerz init failed",
-                details: apiResponse
-            });
+        if (apiResponse?.GatewayPageURL) {
+            res.send({ url: apiResponse.GatewayPageURL });
+        } else {
+            console.log("SSLCommerz init failed:", apiResponse);
+            res.status(500).json({ error: "SSLCommerz init failed", details: apiResponse });
         }
-
-        res.json(apiResponse);
     } catch (err) {
+        console.error("Payment init error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -907,12 +904,12 @@ app.post("/api/payment/init", async (req, res) => {
 // Payment Success API
 app.post("/api/payment/success", async (req, res) => {
     try {
-        const paymentData = req.body;
-        if (!paymentData || !paymentData.tran_id) {
-            return res.redirect("https://city-parking.onrender.com/booking?status=fail");
-        }
+        const { tran_id, amount, value_a, card_issuer, card_brand } = req.body;
+        console.log("Payment Success Data:", req.body);
 
-        const { tran_id, amount, value_a, card_issuer, card_brand } = paymentData;
+        if (!tran_id) {
+            return res.status(400).send("Invalid Payment Data");
+        }
 
         let displayBrand = card_brand === "IB" ? "INTERNETBANKING" : card_brand;
 
@@ -950,8 +947,8 @@ app.post("/api/payment/success", async (req, res) => {
         notifyUpdate();
         res.redirect("https://city-parking.onrender.com/booking");
     } catch (err) {
-        console.error("Success Redirect Error:", err);
-        res.redirect("https://city-parking.onrender.com/booking");
+        console.error("Success Error:", err);
+        res.status(500).send("Internal Server Error during success processing");
     }
 });
 
@@ -959,6 +956,7 @@ app.post("/api/payment/success", async (req, res) => {
 app.post("/api/payment/fail", async (req, res) => {
     try {
         const { tran_id, card_issuer, card_brand } = req.body;
+        console.log("Payment Fail Data:", req.body);
         if (tran_id) {
             await db.collection("payments").updateOne(
                 { tran_id },
@@ -971,26 +969,32 @@ app.post("/api/payment/fail", async (req, res) => {
                 }
             );
         }
+        res.redirect("https://city-parking.onrender.com/booking");
     } catch (err) {
         console.error("Fail Redirect Error:", err);
+        res.redirect("https://city-parking.onrender.com/booking");
+
     }
-    res.redirect("https://city-parking.onrender.com/booking");
 });
 
 // Payment Cancel API
 app.post("/api/payment/cancel", async (req, res) => {
     try {
         const { tran_id } = req.body;
+        console.log("Payment Cancel Data:", req.body);
         if (tran_id) {
             await db.collection("payments").updateOne(
                 { tran_id },
                 { $set: { status: "CANCEL" } }
             );
         }
+        res.redirect("https://city-parking.onrender.com/booking");
+
     } catch (err) {
         console.error("Cancel Redirect Error:", err);
+        res.redirect("https://city-parking.onrender.com/booking");
+
     }
-    res.redirect("https://city-parking.onrender.com/booking?status=cancel");
 });
 
 //AndroidPaymentManagementFeature
