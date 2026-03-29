@@ -13,10 +13,10 @@ const allowedOrigins = [
     "https://city-parking-admin.onrender.com",
     "http://localhost:3000",
     "http://localhost:8000",
-    
+
     "http://localhost",
-    "capacitor://localhost", 
-    
+    "capacitor://localhost",
+
     "file://",
     "http://localhost:8080",
 
@@ -32,12 +32,12 @@ const io = new Server(server, {
                 callback(new Error("Not allowed by CORS"));
             }
         },
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         credentials: true
     },
     transports: ['websocket', 'polling'],
     allowEIO3: true,
-    pingTimeout: 60000, 
+    pingTimeout: 60000,
     pingInterval: 25000
 });
 
@@ -49,7 +49,7 @@ app.use(cors({
             callback(new Error('CORS Error: Origin not allowed'));
         }
     },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true
 }));
 
@@ -858,7 +858,6 @@ app.post("/api/payment/init", async (req, res) => {
             success_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/success",
             fail_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/fail",
             cancel_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/cancel",
-            ipn_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/ipn",
 
             cus_name: name,
             cus_email: email,
@@ -911,17 +910,14 @@ app.post("/api/payment/init", async (req, res) => {
 // Payment Success API
 app.post("/api/payment/success", async (req, res) => {
     try {
-        const paymentData = req.body;
+        const paymentData = req.body || {};
 
-        if (!req.body) {
-            throw new Error("No body received from SSLCommerz");
+        if (!paymentData.tran_id) {
+            console.warn("Success: No tran_id received from SSLCommerz");
+            return res.redirect("https://city-parking.onrender.com/booking");
         }
 
-        const { tran_id, amount, value_a } = req.body || {};
-
-        if (!tran_id) {
-            throw new Error("tran_id missing in response");
-        }
+        const { tran_id, amount, value_a } = paymentData;
 
         if (paymentData.card_brand === "IB") {
             paymentData.card_brand = "INTERNETBANKING";
@@ -965,33 +961,53 @@ app.post("/api/payment/success", async (req, res) => {
 
 // Payment Failed API
 app.post("/api/payment/fail", async (req, res) => {
-    const paymentData = req.body;
-    if (paymentData.card_brand === "IB") {
-        paymentData.card_brand = "INTERNETBANKING";
-    }
-    if (req.body?.tran_id) {
-        await db.collection("payments").updateOne(
-            { tran_id: req.body.tran_id },
-            {
-                $set: {
-                    status: "FAIL",
-                    card_issuer: paymentData.card_issuer,
-                    card_brand: paymentData.card_brand,
-                }
+    try {
+        const paymentData = req.body || {};
+
+        if (paymentData.tran_id) {
+            if (paymentData.card_brand === "IB") {
+                paymentData.card_brand = "INTERNETBANKING";
             }
-        );
+
+            await db.collection("payments").updateOne(
+                { tran_id: paymentData.tran_id },
+                {
+                    $set: {
+                        status: "FAIL",
+                        card_issuer: paymentData.card_issuer || null,
+                        card_brand: paymentData.card_brand || null,
+                        sslResponse: paymentData
+                    }
+                }
+            );
+        }
+    } catch (err) {
+        console.error("Payment fail error:", err);
     }
+
     res.redirect("https://city-parking.onrender.com/booking");
 });
 
 // Payment Cancel API
 app.post("/api/payment/cancel", async (req, res) => {
-    if (req.body?.tran_id) {
-        await db.collection("payments").updateOne(
-            { tran_id: req.body.tran_id },
-            { $set: { status: "CANCEL" } }
-        );
+    try {
+        const paymentData = req.body || {};
+
+        if (paymentData.tran_id) {
+            await db.collection("payments").updateOne(
+                { tran_id: paymentData.tran_id },
+                { 
+                    $set: { 
+                        status: "CANCEL",
+                        sslResponse: paymentData 
+                    } 
+                }
+            );
+        }
+    } catch (err) {
+        console.error("Payment cancel error:", err);
     }
+
     res.redirect("https://city-parking.onrender.com/booking");
 });
 
