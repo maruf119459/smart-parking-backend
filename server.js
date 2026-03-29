@@ -4,16 +4,13 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const { MongoClient, ObjectId } = require("mongodb");
-const SSLCommerzPayment = require("sslcommerz-lts");
 
 const app = express();
 const server = http.createServer(app);
 
-// allowed origins
 const allowedOrigins = [
     "https://city-parking.onrender.com",
     "https://city-parking-admin.onrender.com",
-
     "http://localhost:3000",
     "http://localhost:8000",
 
@@ -24,8 +21,7 @@ const allowedOrigins = [
     "http://localhost:8080",
 ];
 
-// CORS logic to handle browser and server-to-server (SSLCommerz) requests
-const corsOptions = {
+app.use(cors({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
@@ -33,20 +29,25 @@ const corsOptions = {
             callback(new Error('CORS Error: Origin not allowed'));
         }
     },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true
-};
+}));
 
-// Apply CORS middleware
-app.use(cors(corsOptions));
-
-// Middleware 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Socket.io setup
 const io = new Server(server, {
-    cors: corsOptions,
+    cors: {
+        origin: (origin, callback) => {
+            if (!origin || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
+        },
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        credentials: true
+    },
     transports: ['websocket', 'polling'],
     allowEIO3: true,
     pingTimeout: 60000,
@@ -54,10 +55,10 @@ const io = new Server(server, {
 });
 
 
-//Database connection function
 const client = new MongoClient(process.env.MONGO_URI);
 let db;
 
+//Database connection function
 async function connectDB() {
     try {
         await client.connect();
@@ -824,6 +825,7 @@ app.get("/api/parking/stats/:uid", async (req, res) => {
 
 //PaymentManagementFeature
 //Payment Initial API
+const SSLCommerzPayment = require("sslcommerz-lts");
 app.post("/api/payment/init", async (req, res) => {
     try {
         const { parkingId, amount, name, phone, email, vehicleType } = req.body;
@@ -889,12 +891,14 @@ app.post("/api/payment/init", async (req, res) => {
         const apiResponse = await sslcz.init(data);
         console.log("SSL Response:", apiResponse);
 
-        if (apiResponse?.GatewayPageURL) {
-            res.send({ url: apiResponse.GatewayPageURL });
-        } else {
-            console.log("SSLCommerz init failed:", apiResponse);
-            res.status(500).json({ error: "SSLCommerz init failed", details: apiResponse });
+        if (!apiResponse?.GatewayPageURL) {
+            return res.status(500).json({
+                error: "SSLCommerz init failed",
+                details: apiResponse
+            });
         }
+
+        res.json(apiResponse);
     } catch (err) {
         console.error("Payment init error:", err);
         res.status(500).json({ error: err.message });
@@ -905,50 +909,47 @@ app.post("/api/payment/init", async (req, res) => {
 app.post("/api/payment/success", async (req, res) => {
     try {
         const { tran_id, amount, value_a, card_issuer, card_brand } = req.body;
-        console.log("Payment Success Data:", req.body);
-
-        if (!tran_id) {
-            return res.status(400).send("Invalid Payment Data");
-        }
-
         let displayBrand = card_brand === "IB" ? "INTERNETBANKING" : card_brand;
 
-        // Update Payment Record
+        console.log("Payment success data:", req.body);
+
+        if (!tran_id) {
+            throw new Error("tran_id missing in response");
+        }
+
         await db.collection("payments").updateOne(
             { tran_id },
             {
                 $set: {
                     status: "SUCCESS",
                     paidAt: new Date(),
-                    bankName: card_issuer || "Unknown",
-                    accountType: displayBrand || "Unknown",
+                    bankName: card_issuer,
+                    accountType: displayBrand,
                 }
             }
         );
 
-        // Update Parking Record
         const exitTime = new Date();
         exitTime.setMinutes(exitTime.getMinutes() + 10);
 
-        if (value_a && ObjectId.isValid(value_a)) {
-            await db.collection("parking").updateOne(
-                { _id: new ObjectId(value_a) },
-                {
-                    $set: {
-                        exitTime: exitTime,
-                        status: "paid",
-                        paidAmount: Number(amount),
-                        paidAt: new Date(),
-                    }
+        await db.collection("parking").updateOne(
+            { _id: new ObjectId(value_a) },
+            {
+                $set: {
+                    exitTime: exitTime,
+                    status: "paid",
+                    paidAmount: Number(amount),
+                    paidAt: new Date(),
                 }
-            );
-        }
+            }
+        );
 
         notifyUpdate();
+
         res.redirect("https://city-parking.onrender.com/booking");
     } catch (err) {
-        console.error("Success Error:", err);
-        res.status(500).send("Internal Server Error during success processing");
+        console.error("Payment success error:", err);
+        res.redirect("https://city-parking.onrender.com/booking");
     }
 });
 
@@ -956,24 +957,27 @@ app.post("/api/payment/success", async (req, res) => {
 app.post("/api/payment/fail", async (req, res) => {
     try {
         const { tran_id, card_issuer, card_brand } = req.body;
-        console.log("Payment Fail Data:", req.body);
+        let displayBrand = card_brand === "IB" ? "INTERNETBANKING" : card_brand;
+
+        console.log("Payment fail data:", req.body);
+
         if (tran_id) {
             await db.collection("payments").updateOne(
-                { tran_id },
+                { tran_id: req.body.tran_id },
                 {
                     $set: {
                         status: "FAIL",
-                        card_issuer: card_issuer || "Unknown",
-                        card_brand: card_brand === "IB" ? "INTERNETBANKING" : card_brand || "Unknown",
+                        card_issuer: card_issuer,
+                        card_brand: displayBrand,
                     }
                 }
             );
         }
+        console.log("Payment marked as FAIL in DB for tran_id:", tran_id);  
         res.redirect("https://city-parking.onrender.com/booking");
     } catch (err) {
-        console.error("Fail Redirect Error:", err);
+        console.error("Payment fail error:", err);
         res.redirect("https://city-parking.onrender.com/booking");
-
     }
 });
 
@@ -981,19 +985,17 @@ app.post("/api/payment/fail", async (req, res) => {
 app.post("/api/payment/cancel", async (req, res) => {
     try {
         const { tran_id } = req.body;
-        console.log("Payment Cancel Data:", req.body);
         if (tran_id) {
             await db.collection("payments").updateOne(
                 { tran_id },
                 { $set: { status: "CANCEL" } }
             );
         }
+        console.log("Payment marked as CANCEL in DB for tran_id:", tran_id);    
         res.redirect("https://city-parking.onrender.com/booking");
-
     } catch (err) {
         console.error("Cancel Redirect Error:", err);
         res.redirect("https://city-parking.onrender.com/booking");
-
     }
 });
 
