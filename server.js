@@ -23,6 +23,9 @@ const allowedOrigins = [
     "https://smart-parking-backend-u47b.onrender.com"
 ];
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 const io = new Server(server, {
     cors: {
         origin: (origin, callback) => {
@@ -53,8 +56,7 @@ app.use(cors({
     credentials: true
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
 
 const client = new MongoClient(process.env.MONGO_URI);
 let db;
