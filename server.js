@@ -871,6 +871,7 @@ const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const banks = ["BRAC Bank PLC", "City Bank PLC", "Pubali Bank PLC", "Dutch-Bangla Bank PLC", "Islami Bank Bangladesh PLC", "Eastern Bank PLC (EBL)", "Prime Bank PLC"];
 const cardTypes = ["visa", "mastercard", "american express"];
 const BASE_DEPLOY_URL = "https://city-parking.onrender.com";
+const BACK_END_DEPLOY_URL = "https://smart-parking-backend-u47b.onrender.com"
 
 // Payment Initial API
 app.post("/api/payment/init", async (req, res) => {
@@ -904,7 +905,7 @@ app.post("/api/payment/init", async (req, res) => {
                 phone,
                 vehicleType
             },
-            success_url: `${BASE_DEPLOY_URL}/api/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            success_url: `${BACK_END_DEPLOY_URL}/api/payment/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${BASE_DEPLOY_URL}/booking`,
         });
 
@@ -1016,7 +1017,7 @@ app.post("/api/apk/payment/init", async (req, res) => {
                 phone,
                 vehicleType
             },
-            success_url: `${BASE_DEPLOY_URL}/api/apk/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            success_url: `${BACK_END_DEPLOY_URL}/api/apk/payment/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: APP_REDIRECT_URL, 
         });
 
