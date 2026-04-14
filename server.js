@@ -75,6 +75,30 @@ function notifyUpdate() {
     io.emit("db_update");
 }
 
+async function generateUniqueOTP(db) {
+    const ACTIVE_STATUSES = ["request_booking", "paid", "repay"];
+    const now = new Date();
+
+    let oneTimeKey;
+    let isUnique = false;
+
+    while (!isUnique) {
+        oneTimeKey = Math.floor(10000 + Math.random() * 90000);
+
+        const existing = await db.collection("parking").findOne({
+            oneTimeKey: oneTimeKey,
+            status: { $in: ACTIVE_STATUSES },
+            otpExpiresAt: { $gt: now }
+        });
+
+        if (!existing) {
+            isUnique = true;
+        }
+    }
+
+    return oneTimeKey;
+}
+
 app.get("/", (req, res) => {
     res.send("Smart Parking System API is running");
 });
@@ -263,23 +287,39 @@ app.get("/api/slots/available", async (req, res) => {
 // Parking Management
 // Parking Booking Api
 app.post("/api/parking/book", async (req, res) => {
-    const data = {
-        uid: req.body.uid,
-        vehicleType: req.body.vehicleType,
-        name: req.body.name,
-        email: req.body.email,
-        phone: req.body.phone,
-        slotNumber: null,
-        booking_time: new Date(),
-        entryTime: null,
-        exitTime: null,
-        paidAmount: null,
-        status: "request_booking"
-    };
+    try {
+        const now = new Date();
 
-    await db.collection("parking").insertOne(data);
-    notifyUpdate();
-    res.sendStatus(201);
+        // Call function
+        const oneTimeKey = await generateUniqueOTP(db);
+
+        // Booking data
+        const data = {
+            uid: req.body.uid,
+            vehicleType: req.body.vehicleType,
+            name: req.body.name,
+            email: req.body.email,
+            phone: req.body.phone,
+            slotNumber: null,
+            booking_time: now,
+            entryTime: null,
+            exitTime: null,
+            paidAmount: null,
+            status: "request_booking",
+
+            // OTP field
+            oneTimeKey: oneTimeKey
+        };
+
+        // Insert into DB
+        const result = await db.collection("parking").insertOne(data);
+
+        notifyUpdate();
+
+    } catch (err) {
+        console.error("Booking error:", err);
+        res.status(500).json({ error: "Failed to create booking" });
+    }
 });
 
 // User Current Parking
@@ -825,7 +865,14 @@ app.get("/api/parking/stats/:uid", async (req, res) => {
 
 //PaymentManagementFeature
 //Payment Initial API
-const SSLCommerzPayment = require("sslcommerz-lts");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const banks = ["BRAC Bank PLC", "City Bank PLC", "Pubali Bank PLC", "Dutch-Bangla Bank PLC", "Islami Bank Bangladesh PLC", "Eastern Bank PLC (EBL)", "Prime Bank PLC"];
+const cardTypes = ["visa", "mastercard", "american express"];
+const BASE_DEPLOY_URL = "https://city-parking.onrender.com";
+
+// Payment Initial API
 app.post("/api/payment/init", async (req, res) => {
     try {
         const { parkingId, amount, name, phone, email, vehicleType } = req.body;
@@ -834,11 +881,36 @@ app.post("/api/payment/init", async (req, res) => {
             return res.status(400).json({ error: "parkingId & amount required" });
         }
 
-        const tran_id = "TXN_" + Date.now();
+        const unitAmount = Math.round(Number(amount) * 100);
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            line_items: [{
+                price_data: {
+                    currency: "bdt",
+                    product_data: {
+                        name: "Parking Fee",
+                        description: `Vehicle: ${vehicleType}`,
+                    },
+                    unit_amount: unitAmount,
+                },
+                quantity: 1,
+            }],
+            mode: "payment",
+            metadata: {
+                parkingId,
+                name,
+                email,
+                phone,
+                vehicleType
+            },
+            success_url: `${BASE_DEPLOY_URL}/api/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${BASE_DEPLOY_URL}/booking`,
+        });
 
         await db.collection("payments").insertOne({
             parkingId: new ObjectId(parkingId),
-            tran_id,
+            tran_id: session.id,
             amount: Number(amount),
             currency: "BDT",
             status: "INIT",
@@ -849,158 +921,69 @@ app.post("/api/payment/init", async (req, res) => {
             vehicleType: vehicleType
         });
 
-        const data = {
-            total_amount: Number(amount),
-            currency: "BDT",
-            tran_id,
-
-            success_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/success",
-            fail_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/fail",
-            cancel_url: "https://smart-parking-backend-u47b.onrender.com/api/payment/cancel",
-
-            cus_name: name,
-            cus_email: email,
-            cus_phone: phone,
-            cus_add1: "Dhaka",
-            cus_city: "Dhaka",
-            cus_state: "Dhaka",
-            cus_postcode: "1207",
-            cus_country: "Bangladesh",
-
-            shipping_method: "NO",
-            ship_name: "N/A",
-            ship_add1: "N/A",
-            ship_city: "N/A",
-            ship_state: "N/A",
-            ship_postcode: "0000",
-            ship_country: "Bangladesh",
-
-            product_name: "Parking Fee",
-            product_category: "Parking",
-            product_profile: "general",
-
-            num_of_item: 1,
-
-            value_a: parkingId
-        };
-
-        const sslcz = new SSLCommerzPayment(
-            process.env.STORE_ID, process.env.API_KEY, false
-        );
-
-        const apiResponse = await sslcz.init(data);
-        console.log("SSL Response:", apiResponse);
-
-        if (!apiResponse?.GatewayPageURL) {
-            return res.status(500).json({
-                error: "SSLCommerz init failed",
-                details: apiResponse
-            });
-        }
-
-        res.json(apiResponse);
+        res.json({ GatewayPageURL: session.url });
     } catch (err) {
-        console.error("Payment init error:", err);
+        console.error("Stripe init error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
 // Payment Success API
-app.post("/api/payment/success", async (req, res) => {
+app.get("/api/payment/success", async (req, res) => {
     try {
-        const { tran_id, amount, value_a, card_issuer, card_brand } = req.body;
-        let displayBrand = card_brand === "IB" ? "INTERNETBANKING" : card_brand;
+        const { session_id } = req.query;
 
-        console.log("Payment success data:", req.body);
+        const session = await stripe.checkout.sessions.retrieve(session_id, {
+            expand: ['payment_intent']
+        });
 
-        if (!tran_id) {
-            throw new Error("tran_id missing in response");
+        if (session.payment_status !== 'paid') {
+            return res.redirect(`${BASE_DEPLOY_URL}/booking?error=payment_failed`);
         }
 
+        const bankName = getRandom(banks);
+        const accountType = session.payment_intent.payment_method_types?.[0] || getRandom(cardTypes);
+        const parkingId = session.metadata.parkingId;
+        const amount = session.amount_total / 100;
+
         await db.collection("payments").updateOne(
-            { tran_id },
+            { tran_id: session_id },
             {
                 $set: {
                     status: "SUCCESS",
                     paidAt: new Date(),
-                    bankName: card_issuer,
-                    accountType: displayBrand,
+                    bankName: bankName,
+                    accountType: accountType,
                 }
             }
         );
 
         const exitTime = new Date();
         exitTime.setMinutes(exitTime.getMinutes() + 10);
+        const oneTimeKey = await generateUniqueOTP(db);
 
         await db.collection("parking").updateOne(
-            { _id: new ObjectId(value_a) },
+            { _id: new ObjectId(parkingId) },
             {
                 $set: {
                     exitTime: exitTime,
                     status: "paid",
                     paidAmount: Number(amount),
                     paidAt: new Date(),
+                    oneTimeKey: oneTimeKey
                 }
             }
         );
 
         notifyUpdate();
-
-        res.redirect("https://city-parking.onrender.com/booking");
+        res.redirect(`${BASE_DEPLOY_URL}/booking`);
     } catch (err) {
-        console.error("Payment success error:", err);
-        res.redirect("https://city-parking.onrender.com/booking");
+        console.error("Stripe success error:", err);
+        res.redirect(`${BASE_DEPLOY_URL}/booking`);
     }
 });
 
-// Payment Failed API
-app.post("/api/payment/fail", async (req, res) => {
-    try {
-        const { tran_id, card_issuer, card_brand } = req.body;
-        let displayBrand = card_brand === "IB" ? "INTERNETBANKING" : card_brand;
-
-        console.log("Payment fail data:", req.body);
-
-        if (tran_id) {
-            await db.collection("payments").updateOne(
-                { tran_id: req.body.tran_id },
-                {
-                    $set: {
-                        status: "FAIL",
-                        card_issuer: card_issuer,
-                        card_brand: displayBrand,
-                    }
-                }
-            );
-        }
-        console.log("Payment marked as FAIL in DB for tran_id:", tran_id);  
-        res.redirect("https://city-parking.onrender.com/booking");
-    } catch (err) {
-        console.error("Payment fail error:", err);
-        res.redirect("https://city-parking.onrender.com/booking");
-    }
-});
-
-// Payment Cancel API
-app.post("/api/payment/cancel", async (req, res) => {
-    try {
-        const { tran_id } = req.body;
-        if (tran_id) {
-            await db.collection("payments").updateOne(
-                { tran_id },
-                { $set: { status: "CANCEL" } }
-            );
-        }
-        console.log("Payment marked as CANCEL in DB for tran_id:", tran_id);    
-        res.redirect("https://city-parking.onrender.com/booking");
-    } catch (err) {
-        console.error("Cancel Redirect Error:", err);
-        res.redirect("https://city-parking.onrender.com/booking");
-    }
-});
-
-//AndroidPaymentManagementFeature
-//Android Payment Initial API 
+// 1. Android Payment Initial API
 const APP_REDIRECT_URL = "com.smart.city.parking://booking";
 app.post("/api/apk/payment/init", async (req, res) => {
     try {
@@ -1010,11 +993,36 @@ app.post("/api/apk/payment/init", async (req, res) => {
             return res.status(400).json({ error: "parkingId & amount required" });
         }
 
-        const tran_id = "TXN_" + Date.now();
+        const unitAmount = Math.round(Number(amount) * 100);
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            line_items: [{
+                price_data: {
+                    currency: "bdt",
+                    product_data: {
+                        name: "Parking Fee",
+                        description: `Vehicle: ${vehicleType}`,
+                    },
+                    unit_amount: unitAmount,
+                },
+                quantity: 1,
+            }],
+            mode: "payment",
+            metadata: {
+                parkingId,
+                name,
+                email,
+                phone,
+                vehicleType
+            },
+            success_url: `${BASE_DEPLOY_URL}/api/apk/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: APP_REDIRECT_URL, 
+        });
 
         await db.collection("payments").insertOne({
             parkingId: new ObjectId(parkingId),
-            tran_id,
+            tran_id: session.id,
             amount: Number(amount),
             currency: "BDT",
             status: "INIT",
@@ -1025,149 +1033,67 @@ app.post("/api/apk/payment/init", async (req, res) => {
             vehicleType: vehicleType
         });
 
-        const data = {
-            total_amount: Number(amount),
-            currency: "BDT",
-            tran_id,
-
-            success_url: "https://smart-parking-backend-u47b.onrender.com/api/apk/payment/success",
-            fail_url: "https://smart-parking-backend-u47b.onrender.com/api/apk/payment/fail",
-            cancel_url: "https://smart-parking-backend-u47b.onrender.com/api/apk/payment/cancel",
-            ipn_url: "https://smart-parking-backend-u47b.onrender.com/api/apk/payment/ipn",
-
-            cus_name: name,
-            cus_email: email,
-            cus_phone: phone,
-            cus_add1: "Dhaka",
-            cus_city: "Dhaka",
-            cus_state: "Dhaka",
-            cus_postcode: "1207",
-            cus_country: "Bangladesh",
-
-            shipping_method: "NO",
-            ship_name: "N/A",
-            ship_add1: "N/A",
-            ship_city: "N/A",
-            ship_state: "N/A",
-            ship_postcode: "0000",
-            ship_country: "Bangladesh",
-
-            product_name: "Parking Fee",
-            product_category: "Parking",
-            product_profile: "general",
-
-            num_of_item: 1,
-
-            value_a: parkingId
-        };
-
-        const sslcz = new SSLCommerzPayment(
-            process.env.STORE_ID, process.env.API_KEY, false
-        );
-
-        const apiResponse = await sslcz.init(data);
-
-        console.log("SSL Response:", apiResponse);
-
-        if (!apiResponse?.GatewayPageURL) {
-            return res.status(500).json({
-                error: "SSLCommerz init failed",
-                details: apiResponse
-            });
-        }
-
-        res.json(apiResponse);
+        res.json({ GatewayPageURL: session.url });
     } catch (err) {
-        console.error("Payment init error:", err);
+        console.error("APK Stripe init error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Payment Success API
-app.post("/api/apk/payment/success", async (req, res) => {
+// 2. Android Payment Success API
+app.get("/api/apk/payment/success", async (req, res) => {
     try {
-        const paymentData = req.body;
+        const { session_id } = req.query;
+        
+        const session = await stripe.checkout.sessions.retrieve(session_id, {
+            expand: ['payment_intent']
+        });
 
-        if (!req.body) {
-            throw new Error("No body received from SSLCommerz");
+        if (session.payment_status !== 'paid') {
+            return res.redirect(APP_REDIRECT_URL + "?status=failed");
         }
 
-        const { tran_id, amount, value_a } = req.body || {};
-
-        if (!tran_id) {
-            throw new Error("tran_id missing in response");
-        }
-
-        if (paymentData.card_brand === "IB") {
-            paymentData.card_brand = "INTERNETBANKING";
-        }
+        const bankName = getRandom(banks);
+        const accountType = session.payment_intent.payment_method_types?.[0] || getRandom(cardTypes);
+        const parkingId = session.metadata.parkingId;
+        const amount = session.amount_total / 100;
 
         await db.collection("payments").updateOne(
-            { tran_id },
+            { tran_id: session_id },
             {
                 $set: {
                     status: "SUCCESS",
                     paidAt: new Date(),
-                    bankName: paymentData.card_issuer,
-                    accountType: paymentData.card_brand,
+                    bankName: bankName,
+                    accountType: accountType
                 }
             }
         );
 
         const exitTime = new Date();
         exitTime.setMinutes(exitTime.getMinutes() + 10);
+        const oneTimeKey = await generateUniqueOTP(db);
+
 
         await db.collection("parking").updateOne(
-            { _id: new ObjectId(value_a) },
+            { _id: new ObjectId(parkingId) },
             {
                 $set: {
                     exitTime: exitTime,
                     status: "paid",
                     paidAmount: Number(amount),
                     paidAt: new Date(),
+                    oneTimeKey: oneTimeKey
                 }
             }
         );
 
         notifyUpdate();
-
         res.redirect(APP_REDIRECT_URL);
     } catch (err) {
-        console.error("Payment success error:", err);
+        console.error("APK Success Redirect Error:", err);
         res.redirect(APP_REDIRECT_URL);
     }
-});
-
-// Payment Failed API
-app.post("/api/apk/payment/fail", async (req, res) => {
-    const paymentData = req.body;
-    if (paymentData.card_brand === "IB") {
-        paymentData.card_brand = "INTERNETBANKING";
-    }
-    if (req.body?.tran_id) {
-        await db.collection("payments").updateOne(
-            { tran_id: req.body.tran_id },
-            {
-                $set: {
-                    status: "FAIL",
-                    card_issuer: paymentData.card_issuer,
-                    card_brand: paymentData.card_brand,
-                }
-            }
-        );
-    }
-    res.redirect(APP_REDIRECT_URL);
-});
-
-// Payment Cancel API
-app.post("/api/apk/payment/cancel", async (req, res) => {
-    if (req.body?.tran_id) {
-        await db.collection("payments").updateOne(
-            { tran_id: req.body.tran_id },
-            { $set: { status: "CANCEL" } }
-        );
-    }
-    res.redirect(APP_REDIRECT_URL);
 });
 
 
