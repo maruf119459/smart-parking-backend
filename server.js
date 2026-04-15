@@ -153,12 +153,12 @@ app.patch("/api/slots-status-update/:slotId", async (req, res) => {
 
         console.log("slot id: " + slotId)
 
-        // 1️⃣ Validate ObjectId
+        // Validate ObjectId
         if (!ObjectId.isValid(slotId)) {
             return res.status(400).json({ message: "Invalid slotId" });
         }
 
-        // 2️⃣ Validate status
+        // Validate status
         if (!status) {
             return res.status(400).json({ message: "Status is required" });
         }
@@ -171,13 +171,13 @@ app.patch("/api/slots-status-update/:slotId", async (req, res) => {
             });
         }
 
-        // 3️⃣ Update
+        // Update
         const result = await db.collection("slots").updateOne(
             { _id: new ObjectId(slotId) },
             { $set: { status } }
         );
 
-        // 4️⃣ Ensure document exists
+        // Ensure document exists
         if (result.matchedCount === 0) {
             return res.status(404).json({ message: "Slot not found" });
         }
@@ -291,7 +291,8 @@ app.post("/api/parking/book", async (req, res) => {
         const now = new Date();
 
         // Call function
-        const oneTimeKey = await generateUniqueOTP(db);
+        const rawOTP = await generateUniqueOTP(db);
+        const oneTimeKey = Number("1" + rawOTP);
 
         // Booking data
         const data = {
@@ -961,7 +962,8 @@ app.get("/api/payment/success", async (req, res) => {
 
         const exitTime = new Date();
         exitTime.setMinutes(exitTime.getMinutes() + 10);
-        const oneTimeKey = await generateUniqueOTP(db);
+        const rawOTP = await generateUniqueOTP(db);
+        const oneTimeKey = Number("2" + rawOTP);
 
         await db.collection("parking").updateOne(
             { _id: new ObjectId(parkingId) },
@@ -1018,7 +1020,7 @@ app.post("/api/apk/payment/init", async (req, res) => {
                 vehicleType
             },
             success_url: `${BACK_END_DEPLOY_URL}/api/apk/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: APP_REDIRECT_URL, 
+            cancel_url: APP_REDIRECT_URL,
         });
 
         await db.collection("payments").insertOne({
@@ -1045,7 +1047,7 @@ app.post("/api/apk/payment/init", async (req, res) => {
 app.get("/api/apk/payment/success", async (req, res) => {
     try {
         const { session_id } = req.query;
-        
+
         const session = await stripe.checkout.sessions.retrieve(session_id, {
             expand: ['payment_intent']
         });
@@ -1073,8 +1075,8 @@ app.get("/api/apk/payment/success", async (req, res) => {
 
         const exitTime = new Date();
         exitTime.setMinutes(exitTime.getMinutes() + 10);
-        const oneTimeKey = await generateUniqueOTP(db);
-
+        const rawOTP = await generateUniqueOTP(db);
+        const oneTimeKey = Number("2" + rawOTP);
 
         await db.collection("parking").updateOne(
             { _id: new ObjectId(parkingId) },
@@ -1415,6 +1417,125 @@ app.get("/api/rules-and-regulations", async (req, res) => {
     } catch (err) {
         console.error("Get rules and regulations error:", err);
         res.status(500).json({ error: "Failed to fetch rules and regulations" });
+    }
+});
+
+app.get("/api/parking/verify", async (req, res) => {
+    try {
+        const oneTimeKey = parseInt(req.query.oneTimeKey);
+        const vehicleType = req.query.vehicleType;
+        const now = new Date();
+
+        // Validate input
+        if (!oneTimeKey) {
+            return res.status(400).json({ error: "OTP is required" });
+        }
+
+        if (!vehicleType) {
+            return res.status(400).json({ error: "Vehicle type is required" });
+        }
+
+        // Find booking by OTP
+        const booking = await db.collection("parking").findOne({
+            oneTimeKey: oneTimeKey
+        });
+
+        if (!booking) {
+            return res.status(404).json({ error: "Invalid OTP" });
+        }
+
+        const prefix = oneTimeKey.toString()[0];
+
+        // ENTRY (Prefix = 1)
+        if (prefix === "1") {
+
+            // Prevent duplicate entry
+            if (booking.status === "parked") {
+                return res.status(400).json({
+                    error: "Already entered"
+                });
+            }
+
+            const bookingTime = new Date(booking.booking_time);
+            const expireTime = new Date(bookingTime.getTime() + 10 * 60 * 1000);
+
+            if (now > expireTime) {
+                return res.status(400).json({
+                    error: "OTP expired. Please book again."
+                });
+            }
+
+            // Check vehicle type match
+            if (booking.vehicleType !== vehicleType) {
+                return res.status(400).json({
+                    error: "Vehicle type not match"
+                });
+            }
+
+            await db.collection("parking").updateOne(
+                { _id: booking._id },
+                {
+                    $set: {
+                        entryTime: now,
+                        status: "parked"
+                    }
+                }
+            );
+
+            return res.status(200).json({
+                message: "ENTRY_OK"
+            });
+        }
+
+        // EXIT (Prefix = 2)
+        else if (prefix === "2") {
+
+            // Prevent duplicate exit
+            if (booking.status === "completed") {
+                return res.status(400).json({
+                    error: "Already exited"
+                });
+            }
+
+            if (!booking.paidAt) {
+                return res.status(400).json({
+                    error: "Payment not found"
+                });
+            }
+
+            const paidTime = new Date(booking.paidAt);
+            const expireTime = new Date(paidTime.getTime() + 10 * 60 * 1000);
+
+            if (now > expireTime) {
+                return res.status(400).json({
+                    error: "PAID_FINE"
+                });
+            }
+
+            await db.collection("parking").updateOne(
+                { _id: booking._id },
+                {
+                    $set: {
+                        exitTime: now,
+                        status: "completed"
+                    }
+                }
+            );
+
+            return res.status(200).json({
+                message: "EXIT_OK"
+            });
+        }
+
+        else {
+            return res.status(400).json({
+                error: "Invalid OTP format"
+            });
+        }
+
+    } catch (err) {
+        console.error("Verify error:", err);
+        res.status(500).json({ error: "Server error" });
     }
 });
 
