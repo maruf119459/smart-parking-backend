@@ -1426,7 +1426,6 @@ app.get("/api/parking/verify", async (req, res) => {
         const vehicleType = req.query.vehicleType;
         const now = new Date();
 
-        // Validate input
         if (!oneTimeKey) {
             return res.status(400).json({ error: "OTP is required" });
         }
@@ -1435,10 +1434,8 @@ app.get("/api/parking/verify", async (req, res) => {
             return res.status(400).json({ error: "Vehicle type is required" });
         }
 
-        // Find booking by OTP
-        const booking = await db.collection("parking").findOne({
-            oneTimeKey: oneTimeKey
-        });
+        // Find booking
+        const booking = await db.collection("parking").findOne({ oneTimeKey });
 
         if (!booking) {
             return res.status(404).json({ error: "Invalid OTP" });
@@ -1446,14 +1443,11 @@ app.get("/api/parking/verify", async (req, res) => {
 
         const prefix = oneTimeKey.toString()[0];
 
-        // ENTRY (Prefix = 1)
+        // ENTRY
         if (prefix === "1") {
 
-            // Prevent duplicate entry
             if (booking.status === "parked") {
-                return res.status(400).json({
-                    error: "Already entered"
-                });
+                return res.status(400).json({ error: "Already entered" });
             }
 
             const bookingTime = new Date(booking.booking_time);
@@ -1465,37 +1459,55 @@ app.get("/api/parking/verify", async (req, res) => {
                 });
             }
 
-            // Check vehicle type match
             if (booking.vehicleType !== vehicleType) {
                 return res.status(400).json({
                     error: "Vehicle type not match"
                 });
             }
 
+            // Find FREE slot for this vehicle type
+            const slot = await db.collection("slots").findOne({
+                vehicleType: vehicleType,
+                status: "free"
+            });
+
+            if (!slot) {
+                return res.status(400).json({
+                    error: "No slot available"
+                });
+            }
+
+            // Update slot → booked
+            await db.collection("slots").updateOne(
+                { _id: slot._id },
+                { $set: { status: "booked" } }
+            );
+
+            // Update booking with slotNumber
             await db.collection("parking").updateOne(
                 { _id: booking._id },
                 {
                     $set: {
                         entryTime: now,
-                        status: "parked"
+                        status: "parked",
+                        slotNumber: slot.slotNumber 
                     }
                 }
             );
+
             notifyUpdate();
 
             return res.status(200).json({
-                message: "ENTRY_OK"
+                message: "ENTRY_OK",
+                slotNumber: slot.slotNumber
             });
         }
 
-        // EXIT (Prefix = 2)
+        //EXIT
         else if (prefix === "2") {
 
-            // Prevent duplicate exit
             if (booking.status === "completed") {
-                return res.status(400).json({
-                    error: "Already exited"
-                });
+                return res.status(400).json({ error: "Already exited" });
             }
 
             if (!booking.paidAt) {
@@ -1513,6 +1525,15 @@ app.get("/api/parking/verify", async (req, res) => {
                 });
             }
 
+            // Free the slot
+            if (booking.slotNumber) {
+                await db.collection("slots").updateOne(
+                    { slotNumber: booking.slotNumber },
+                    { $set: { status: "free" } }
+                );
+            }
+
+            // Update booking
             await db.collection("parking").updateOne(
                 { _id: booking._id },
                 {
@@ -1522,6 +1543,7 @@ app.get("/api/parking/verify", async (req, res) => {
                     }
                 }
             );
+
             notifyUpdate();
 
             return res.status(200).json({
