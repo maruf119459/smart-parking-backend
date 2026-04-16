@@ -1481,6 +1481,7 @@ app.get("/api/parking/verify", async (req, res) => {
                     }
                 }
             );
+            notifyUpdate();
 
             return res.status(200).json({
                 message: "ENTRY_OK"
@@ -1521,6 +1522,7 @@ app.get("/api/parking/verify", async (req, res) => {
                     }
                 }
             );
+            notifyUpdate();
 
             return res.status(200).json({
                 message: "EXIT_OK"
